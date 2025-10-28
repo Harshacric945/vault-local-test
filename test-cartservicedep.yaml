@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cartservice
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cartservice
+  template:
+    metadata:
+      labels:
+        app: cartservice
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "cartservice-role"
+        vault.hashicorp.com/agent-inject-secret-config: "kv/data/cart/config"
+        vault.hashicorp.com/agent-inject-template-config: |
+          {{- with secret "kv/data/cart/config" -}}
+          export REDIS_HOST="{{ .Data.data.redis_host }}"
+          export REDIS_PORT="{{ .Data.data.redis_port }}"
+          export CACHE_TTL="{{ .Data.data.cache_ttl }}"
+          {{- end -}}
+    spec:
+      serviceAccountName: cartservice-sa
+      containers:
+      - name: server
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Waiting for Vault secrets..."
+            for i in $(seq 1 30); do
+              [ -s /vault/secrets/config ] && break || sleep 1
+            done
+            
+            if [ -f /vault/secrets/config ]; then
+              source /vault/secrets/config
+              echo "========================================="
+              echo "✓ Secrets loaded from Vault!"
+              echo "========================================="
+              echo "REDIS_HOST=\$REDIS_HOST"
+              echo "REDIS_PORT=\$REDIS_PORT"
+              echo "CACHE_TTL=\$CACHE_TTL"
+              echo "========================================="
+            else
+              echo "✗ Failed to load secrets from Vault"
+              exit 1
+            fi
+            
+            # Keep container running
+            echo "Application running..."
+            while true; do sleep 3600; done
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
