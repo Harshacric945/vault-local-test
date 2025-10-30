@@ -174,7 +174,7 @@ vault write auth/kubernetes/role/test-role \
 Apply the Kubernetes auth setup YAML:
 
 ```bash
-kubectl apply -f vault-kubernetes-auth-SETUP.yaml
+kubectl apply -f k8sdemo-auth-setup.yaml
 ```
 
 Verify:
@@ -203,7 +203,7 @@ Run only the script:
 ### Scenario 2: Testing Full App Integration
 
 1. Run the setup script (Vault installed)
-2. Apply `vault-kubernetes-auth-SETUP.yaml`
+2. Apply `k8sdemo-auth-setup.yaml`
 3. Create Vault roles and policies for your app
 4. Deploy your app with Vault Agent Injector
 
@@ -275,7 +275,7 @@ CACHE_TTL=300
 kubectl delete -f test-cartservice.yaml
 helm uninstall vault -n vault
 kubectl delete namespace vault
-kubectl delete -f vault-kubernetes-auth-SETUP.yaml
+kubectl delete -f k8sdemo-auth-setup.yaml
 ```
 
 ---
