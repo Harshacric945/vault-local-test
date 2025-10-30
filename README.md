@@ -1,256 +1,314 @@
-Local Vault Testing - Docker Desktop Kubernetes
-Prerequisites
-git bash installed on your local laptop 
 
-helm installed on your local laptop 
+# 🧩 Local Vault Testing on Docker Desktop (Kubernetes)
 
-choco install helm 
+This guide helps you **test HashiCorp Vault locally** using **Docker Desktop’s Kubernetes** environment.  
+It automates Vault installation, initialization, unsealing, and Kubernetes authentication setup.
 
-vault cli installed on your local laptop 
+---
 
-choco install vault 
+## 🧰 Prerequisites
 
-Before this install chocolatey which is a windows packaged manager to install all types of tools or cli 
+Ensure you have the following installed on your Windows laptop:
 
-Docker Desktop with Kubernetes enabled
+### 🪄 Chocolatey (Windows Package Manager)
+Chocolatey is used to install CLI tools easily.
 
-Open Docker Desktop → Settings → Kubernetes → Enable Kubernetes
-Wait for it to show "Kubernetes is running"
+```bash
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+````
 
-You need to switch to Docker Desktop's local Kubernetes context.
-'''bash
+### 🔧 Install Required Tools
+
+```bash
+choco install git
+choco install helm
+choco install vault
+```
+
+### 🐳 Docker Desktop with Kubernetes Enabled
+
+1. Open **Docker Desktop → Settings → Kubernetes → Enable Kubernetes**
+2. Wait until it shows:
+   **“Kubernetes is running”**
+
+---
+
+## ⚙️ Switch to Docker Desktop Kubernetes Context
+
+```bash
 # List all contexts
 kubectl config get-contexts
 
-# You'll see something like:
+# Example output:
 # CURRENT   NAME             CLUSTER
-# *         arn:aws:eks...   eks-cluster    ← Currently active (broken)
-#           docker-desktop   docker-desktop ← Local K8s
+# *         arn:aws:eks...   eks-cluster
+#           docker-desktop   docker-desktop
 
-# Switch to docker-desktop
+# Switch to Docker Desktop
 kubectl config use-context docker-desktop
 
-# Verify
+# Verify the connection
 kubectl cluster-info
 ```
 
-**Should now show:**
+✅ Expected Output:
+
 ```
 Kubernetes control plane is running at https://kubernetes.docker.internal:6443
 CoreDNS is running at https://kubernetes.docker.internal:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
-'''
+```
 
-Quick Test After Switching
-bash'''
-Should work now
+---
+
+## 🔍 Quick Test After Switching
+
+```bash
 kubectl get nodes
-
-# Expected output:
-# NAME             STATUS   ROLES           AGE   VERSION
-# docker-desktop   Ready    control-plane   Xd    v1.29.x
-
-# Check namespaces
 kubectl get namespaces
+```
 
-# Should show default K8s namespaces:
-# default, kube-system, kube-public, kube-node-lease
-'''
-clone the git repository from github in your local laptop or you can fork in your own account and then clone it 
+✅ Expected Output:
 
+```
+NAME             STATUS   ROLES           AGE   VERSION
+docker-desktop   Ready    control-plane   Xd    v1.29.x
+```
+
+Default namespaces:
+
+```
+default, kube-system, kube-public, kube-node-lease
+```
+
+---
+
+## 📦 Clone the Repository
+
+```bash
 git clone https://github.com/Harshacric945/vault-local-test.git
+cd vault-local-test
+```
 
-cd vault-local-test or open this folder through Microsoft VS code with git bash as a terminal to execute the .sh scripts as they wont be executed in cmd or ps1
+Or open the folder in **VS Code** using the integrated Git Bash terminal.
 
-ls
+---
 
-chmod +x local-vault-test.sh -Make the script executable or modify the permissions to give executable permissions for the file 
+## 🚀 Run the Setup Script
 
-./local-vault-test.sh  -> execute the script 
+Make the script executable and run it:
 
-This script does everything from adding helm repo for vault , creating namescape for vault , creating values.yaml for vault with one pod only bcz rn we only have one node so for local testing its okay , installing vault , initilaizing , unsealing the vault pod manually by shamir keys method , testing basic operations like enabling kv pair engine , storing and reading secret , enabling kubernetes authorization and configuring kubernetes authentication , crating k8s roles for test and vault policies and finally setting up port forward too 
+```bash
+chmod +x local-vault-test.sh
+./local-vault-test.sh
+```
 
-Now u can access the vault UI at localhost:8200 
+This script will:
 
+* Add the Helm repo for Vault
+* Create the `vault` namespace
+* Generate a `values.yaml` for local setup (single pod)
+* Install Vault via Helm
+* Initialize and unseal Vault (manually via Shamir keys)
+* Enable KV engine and store/read test secrets
+* Configure Kubernetes authentication
+* Create test roles and policies
+* Start port-forwarding to the Vault UI
 
-If u encounter any issues quick fixes 
+Vault UI will be available at:
+👉 **[http://localhost:8200](http://localhost:8200)**
 
- 1. Uninstall any existing Vault
+---
+
+## 🧹 Quick Fixes
+
+If you encounter issues, run:
+
+```bash
+# 1. Uninstall existing Vault
 helm uninstall vault -n vault 2>/dev/null || echo "No Vault found"
 
-# 2. Delete the namespace (this cleans everything)
+# 2. Delete namespace
 kubectl delete namespace vault
 
-# 3. Wait a few seconds for cleanup
+# 3. Wait and verify cleanup
 sleep 10
-
-# 4. Verify namespace is gone
 kubectl get namespace vault
-# Should show: Error from server (NotFound): namespaces "vault" not found
+# Should show: Error from server (NotFound)
+```
 
-# 5. Now run the script again
+Then re-run the script:
+
+```bash
 ./local-vault-test.sh
+```
 
-Understanding the Flow
-What the script does:
-bash# This creates a TEST ServiceAccount
+---
+
+## 🧠 Understanding the Flow
+
+### Script Actions
+
+```bash
+# Create a test ServiceAccount
 kubectl create serviceaccount vault-test-sa
 
-# This creates a Vault role bound to that SA
+# Bind Vault role to ServiceAccount
 vault write auth/kubernetes/role/test-role \
-    bound_service_account_names=vault-test-sa  # ← Only binds to vault-test-sa
+    bound_service_account_names=vault-test-sa
+```
 
-    At this point:
+✅ After script execution:
 
-Vault is installed ✅
-Initialized with 5 keys + root token ✅
-All 3 pods unsealed ✅
-Basic features tested ✅
+* Vault installed
+* Initialized with 5 keys + root token
+* Pods unsealed
+* KV engine tested
+* Kubernetes auth configured
 
-Phase 2: Apply Kubernetes Auth Setup
-bash# Apply the auth setup YAML
+---
+
+## ⚙️ Phase 2: Kubernetes Auth Setup
+
+Apply the Kubernetes auth setup YAML:
+
+```bash
 kubectl apply -f vault-kubernetes-auth-SETUP.yaml
+```
 
-# Verify ServiceAccounts created
+Verify:
+
+```bash
 kubectl get sa -n vault
-# Should show: vault-auth
-
 kubectl get sa -n default
-# Should show: cartservice-sa, checkoutservice-sa, etc.
+```
 
+---
 
-Two Scenarios:
-Scenario 1: Just Testing Vault Features (Script alone is enough)
-If you just want to verify:
+## 🎯 Scenarios
 
-Vault initializes correctly
-Unsealing works
-KV secrets work
-Kubernetes auth mechanism works
+### Scenario 1: Testing Vault Only
 
-Then: Run the script alone. No need for auth-setup.yaml.
-bash./local-vault-test-portforward.sh
-# This proves Vault itself is working!
+Run only the script:
 
-Scenario 2: Testing Full App Deployment (Need auth-setup.yaml)
-If you want to deploy your actual cartservice and have it pull secrets from Vault, you need:
+```bash
+./local-vault-test-portforward.sh
+```
 
-Run the script first (sets up Vault)
-Apply auth-setup.yaml (creates app ServiceAccounts)
-Create roles for your apps (bind cartservice-sa to Vault)
-Deploy your app (cartservice uses Vault Agent Injector)
+✅ Verifies Vault initialization, unseal, and KV engine.
 
-At this point:
+---
 
-vault-auth SA exists (Vault can review tokens) ✅
-cartservice-sa exists (your app can authenticate) ✅
+### Scenario 2: Testing Full App Integration
 
-Phase 3: Configure Vault for Your Apps
-bash# Set Vault address and token
+1. Run the setup script (Vault installed)
+2. Apply `vault-kubernetes-auth-SETUP.yaml`
+3. Create Vault roles and policies for your app
+4. Deploy your app with Vault Agent Injector
+
+---
+
+## 🏗️ Phase 3: Configure Vault for Your Apps
+
+```bash
 export VAULT_TOKEN=$(cat vault-keys.json | jq -r '.root_token')
 export VAULT_ADDR="http://localhost:8200"
 
-# Get vault-auth SA token
 VAULT_AUTH_TOKEN=$(kubectl create token vault-auth -n vault)
-
-# Get Kubernetes info
 KUBERNETES_HOST=$(kubectl config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}')
 KUBERNETES_CA_CERT=$(kubectl config view --raw --minify --flatten -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d)
 
-# Reconfigure Kubernetes auth with vault-auth SA
 kubectl exec -n vault vault-0 -- env VAULT_TOKEN=$VAULT_TOKEN vault write auth/kubernetes/config \
     kubernetes_host="$KUBERNETES_HOST" \
     kubernetes_ca_cert="$KUBERNETES_CA_CERT" \
     token_reviewer_jwt="$VAULT_AUTH_TOKEN"
 
-echo "✓ Kubernetes auth reconfigured with vault-auth SA"
-
-# Create policy for cartservice
+# Create policy
 kubectl exec -i -n vault vault-0 -- env VAULT_TOKEN=$VAULT_TOKEN vault policy write cartservice-policy - <<EOF
 path "kv/data/cart/*" {
   capabilities = ["read", "list"]
 }
 EOF
 
-echo "✓ Policy created for cartservice"
-
-# Create Vault role for cartservice
+# Create Vault role
 kubectl exec -n vault vault-0 -- env VAULT_TOKEN=$VAULT_TOKEN vault write auth/kubernetes/role/cartservice-role \
     bound_service_account_names=cartservice-sa \
     bound_service_account_namespaces=default \
     policies=cartservice-policy \
     ttl=1h
 
-echo "✓ Vault role created for cartservice"
-
-# Store test secret for cartservice
+# Store test secret
 kubectl exec -n vault vault-0 -- env VAULT_TOKEN=$VAULT_TOKEN vault kv put kv/cart/config \
     redis_host="redis.default.svc" \
     redis_port="6379" \
     cache_ttl="300"
+```
 
-echo "✓ Secrets stored for cartservice"
+✅ Now your app’s ServiceAccount can authenticate and fetch secrets securely.
 
-At this point:
+---
 
-Kubernetes auth uses vault-auth SA ✅
-cartservice-sa can authenticate to Vault ✅
-Policy allows cartservice to read secrets ✅
+## 🧩 Phase 4: Deploy Test Application
 
-
-Phase 4: Deploy Test Application
-
+```bash
 kubectl apply -f test-cartservicedep.yaml
-
-# Wait for pod
 kubectl wait --for=condition=ready pod -l app=cartservice --timeout=120s
-
-# Check if it worked
 kubectl get pods -l app=cartservice
-
-# Should show: cartservice-xxx   2/2   Running
-#              ^ app + vault-agent sidecar
-
-# Check logs - should show secrets loaded
 kubectl logs -l app=cartservice -c server
+```
 
-# Expected output:
-# =========================================
-# ✓ Secrets loaded from Vault!
-# =========================================
-# REDIS_HOST=redis.default.svc
-# REDIS_PORT=6379
-# CACHE_TTL=300
-# =========================================
+✅ Expected Output:
 
-If you see this, everything is working perfectly! ✅
+```
+✓ Secrets loaded from Vault!
+REDIS_HOST=redis.default.svc
+REDIS_PORT=6379
+CACHE_TTL=300
+```
 
-Cleanup (When Done)
-bash# Delete test deployment
+---
+
+## 🧹 Cleanup
+
+```bash
 kubectl delete -f test-cartservice.yaml
-
-# Stop port-forward (use PID from script output)
-kill <PORT_FORWARD_PID>
-
-# Or just Ctrl+C in the terminal running port-forward
-
-# Delete Vault
 helm uninstall vault -n vault
 kubectl delete namespace vault
-
-# Delete ServiceAccounts
 kubectl delete -f vault-kubernetes-auth-SETUP.yaml
+```
 
+---
 
-Summary: What Each Step Does
-StepWhat It DoesRequired ForScriptInstalls Vault, tests basic featuresTesting Vault itselfauth-setup.yamlCreates ServiceAccounts for appsApp authenticationPhase 3 commandsLinks apps to Vault policiesApp authorizationPhase 4 deploymentDeploys app with Vault injectionEnd-to-end test
+## 🪶 Summary
 
-Quick Decision Guide
-Want to just verify Vault works?
-→ Run script only ✅
-Want to test full app deployment with Vault?
-→ Run all phases (1-5) ✅
-Deploying to EKS later?
-→ Test all phases locally first, then you'll know exactly what to expect on EKS ✅
+| Step              | Purpose                       | Required For          |
+| ----------------- | ----------------------------- | --------------------- |
+| Script            | Installs and configures Vault | Vault testing         |
+| `auth-setup.yaml` | Creates ServiceAccounts       | App auth              |
+| Phase 3           | Binds apps to Vault policies  | Authorization         |
+| Phase 4           | Deploys test app              | End-to-end validation |
 
+---
 
+## 💡 Tips for Local to EKS Transition
+
+* Verify everything locally first
+* The same setup works on **EKS** with minor changes (IRSA, Helm values)
+* Once confident, automate everything with **Helm + Argo CD**
+
+---
+
+## ✅ Quick Decision Guide
+
+| Goal                       | Action                       |
+| -------------------------- | ---------------------------- |
+| Verify Vault setup only    | Run script                   |
+| Test app + Vault injection | Run all phases               |
+| Prepare for EKS deployment | Run all phases locally first |
+
+---
+
+**Author:** [Harsha Koppu](https://github.com/Harshacric945)
+**License:** MIT
 
